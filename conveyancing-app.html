@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ConveyPro SA — Professional Conveyancing Suite</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#0C1B3A;--navy-dark:#07102A;--navy-mid:#162847;--navy-light:#1E3560;--navy-faint:#EEF2F8;
+  --gold:#C9A84C;--gold-light:#E0C06A;--gold-pale:#FDF4DC;--gold-pale2:#F8ECBE;
+  --white:#FFFFFF;--cream:#FAF8F3;
+  --g50:#F9FAFB;--g100:#F3F4F6;--g200:#E5E7EB;--g300:#D1D5DB;--g400:#9CA3AF;
+  --g500:#6B7280;--g600:#4B5563;--g700:#374151;--g800:#1F2937;--g900:#111827;
+  --green:#166534;--green-bg:#DCFCE7;--red:#991B1B;--red-bg:#FEE2E2;
+  --amber:#92400E;--amber-bg:#FEF3C7;--blue:#1E40AF;--blue-bg:#DBEAFE;--purple:#5B21B6;--purple-bg:#EDE9FE;
+  --r:10px;--r-sm:6px;--r-lg:14px;
+  --shadow:0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:0 4px 16px rgba(0,0,0,0.08);
+  --shadow-lg:0 20px 60px rgba(7,16,38,0.25);
+}
+html,body{height:100%}
+body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cream);color:var(--g800);overflow:hidden;font-size:14px;line-height:1.5}
+#root{height:100%}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(201,168,76,.3);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:rgba(201,168,76,.6)}
+input,select,textarea,button{font-family:inherit}
+.mono{font-family:'DM Mono',monospace}
+.serif{font-family:'Cormorant Garamond',Georgia,serif}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold)!important}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+.anim{animation:fadeIn 0.3s ease both}
+.anim2{animation:fadeIn 0.3s .05s ease both}
+.anim3{animation:fadeIn 0.3s .1s ease both}
+.anim4{animation:fadeIn 0.3s .15s ease both}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const{useState,useEffect,useCallback,useMemo,useRef}=React;
+
+// ═══════════════════════════════════════════════════════════════
+// STORAGE — localStorage wrapper
+// ═══════════════════════════════════════════════════════════════
+function useLS(key,init){
+  const[state,setState]=useState(()=>{try{const v=localStorage.getItem('cp_'+key);return v?JSON.parse(v):init}catch{return init}});
+  const set=useCallback(upd=>setState(prev=>{const next=typeof upd==='function'?upd(prev):upd;try{localStorage.setItem('cp_'+key,JSON.stringify(next))}catch{}return next}),[key]);
+  return[state,set];
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SA CONVEYANCING RATES — 2024 / 2025
+// ═══════════════════════════════════════════════════════════════
+const TD=[
+  {from:0,to:1100000,base:0,rate:0,thr:0},
+  {from:1100001,to:1512500,base:0,rate:.03,thr:1100000},
+  {from:1512501,to:2117500,base:12375,rate:.06,thr:1512500},
+  {from:2117501,to:2722500,base:48675,rate:.08,thr:2117500},
+  {from:2722501,to:12100000,base:97075,rate:.11,thr:2722500},
+  {from:12100001,to:Infinity,base:1128600,rate:.13,thr:12100000},
+];
+function calcTD(p){if(!p||p<=0)return 0;for(const b of TD){if(p<=b.to)return Math.round(b.base+Math.max(0,p-b.thr)*b.rate);}return 0;}
+function convFee(v){if(!v||v<=0)return 0;const t=[[100000,5900],[200000,8250],[300000,10500],[400000,12600],[500000,14600],[600000,16400],[700000,18100],[800000,19700],[900000,21200],[1000000,22600],[1500000,28200],[2000000,33400],[3000000,43400],[5000000,59000],[10000000,91000]];for(const[l,f]of t)if(v<=l)return f;return Math.round(91000+(v-10000000)*.0045);}
+function deedsFee(v){if(!v||v<=0)return 0;const t=[[30000,255],[40000,298],[60000,372],[80000,446],[100000,520],[150000,705],[200000,890],[250000,1040],[300000,1190],[350000,1320],[400000,1450],[500000,1670],[600000,1850],[700000,2020],[800000,2175],[900000,2315],[1000000,2455],[1200000,2690],[1500000,3040],[2000000,3590],[2500000,4050],[3000000,4470],[5000000,5750]];for(const[l,f]of t)if(v<=l)return f;return Math.round(5750+Math.ceil((v-5000000)/1000000)*400);}
+function calcBuyer(pp,bond,newDev){
+  const td=newDev?0:calcTD(pp),cf=convFee(pp),cfV=Math.round(cf*.15),df=deedsFee(pp);
+  const bf=bond>0?convFee(bond):0,bfV=bond>0?Math.round(bf*.15):0,bdf=deedsFee(bond);
+  return{td,cf,cfV,df,pm:1500,bf,bfV,bdf,bpm:bond>0?1200:0,total:td+cf+cfV+df+1500+(bond>0?bf+bfV+bdf+1200:0)};
+}
+
+// ─── Formatters ───────────────────────────────────────────────
+const fmtR=n=>'R\u00A0'+Math.round(n||0).toLocaleString('en-ZA');
+const fmtS=n=>{if(!n)return'R\u00A00';const m=Math.round(n);if(m>=1e6)return'R\u00A0'+(m/1e6).toFixed(2)+'M';if(m>=1000)return'R\u00A0'+(m/1000).toFixed(0)+'k';return fmtR(m);};
+const fmtD=d=>d?new Date(d+'T00:00:00').toLocaleDateString('en-ZA',{year:'numeric',month:'short',day:'numeric'}):'—';
+const today=()=>new Date().toISOString().split('T')[0];
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2);
+const num=v=>parseFloat(v)||0;
+
+// ═══════════════════════════════════════════════════════════════
+// BASE COMPONENTS
+// ═══════════════════════════════════════════════════════════════
+const STATUS={
+  'Active':{bg:'#DBEAFE',c:'#1D4ED8'},'Pending Docs':{bg:'#FEF9C3',c:'#854D0E'},
+  'Awaiting Bond':{bg:'#EDE9FE',c:'#6D28D9'},'Lodged':{bg:'#FEF3C7',c:'#92400E'},
+  'Rates Clearance':{bg:'#D1FAE5',c:'#065F46'},'Registered':{bg:'#DCFCE7',c:'#166534'},
+  'Cancelled':{bg:'#FEE2E2',c:'#991B1B'},'On Hold':{bg:'#F3F4F6',c:'#374151'},
+};
+function Pill({label}){
+  const s=STATUS[label]||{bg:'#F3F4F6',c:'#6B7280'};
+  return <span style={{display:'inline-block',padding:'2px 10px',borderRadius:20,background:s.bg,color:s.c,fontSize:11,fontWeight:700,letterSpacing:'.03em',whiteSpace:'nowrap'}}>{label}</span>;
+}
+
+function Card({children,style={},onClick,hover}){
+  const[h,setH]=useState(false);
+  return<div onClick={onClick} onMouseEnter={()=>hover&&setH(true)} onMouseLeave={()=>setH(false)}
+    style={{background:'#fff',borderRadius:'var(--r)',border:`1px solid ${h?'var(--gold)':'var(--g200)'}`,
+      padding:'20px 22px',transition:'border-color .15s,box-shadow .15s',cursor:onClick?'pointer':'default',
+      boxShadow:h?'0 4px 20px rgba(201,168,76,.12)':'var(--shadow)',...style}}>{children}</div>
+}
+
+const V={
+  gold:{bg:'var(--gold)',c:'var(--navy)',border:'var(--gold)',hbg:'var(--gold-light)'},
+  navy:{bg:'var(--navy)',c:'var(--gold)',border:'var(--navy)',hbg:'var(--navy-mid)'},
+  ghost:{bg:'transparent',c:'var(--g700)',border:'var(--g300)',hbg:'var(--g50)'},
+  danger:{bg:'var(--red-bg)',c:'var(--red)',border:'#FECACA',hbg:'#FECACA'},
+  success:{bg:'var(--green-bg)',c:'var(--green)',border:'#BBF7D0',hbg:'#BBF7D0'},
+};
+function Btn({children,onClick,variant='gold',size='md',full,disabled,style={}}){
+  const[h,setH]=useState(false);const v=V[variant]||V.gold;
+  return<button onClick={onClick} disabled={disabled} onMouseEnter={()=>setH(true)} onMouseLeave={()=>setH(false)}
+    style={{background:h?v.hbg:v.bg,color:v.c,border:`1px solid ${v.border}`,padding:size==='sm'?'5px 13px':'8px 20px',
+      borderRadius:'var(--r-sm)',fontWeight:600,fontSize:size==='sm'?12:14,cursor:disabled?'not-allowed':'pointer',
+      width:full?'100%':undefined,transition:'all .15s',opacity:disabled?.6:1,whiteSpace:'nowrap',...style}}>{children}</button>;
+}
+
+function Inp({label,value,onChange,type='text',placeholder,prefix,rows,required,style={}}){
+  const base={width:'100%',padding:'8px 12px',border:'1px solid var(--g200)',borderRadius:'var(--r-sm)',
+    fontSize:14,background:'#fff',color:'var(--g800)',fontFamily:'inherit',transition:'border-color .15s'};
+  return<div style={{marginBottom:14,...style}}>
+    {label&&<label style={{display:'block',fontSize:11,fontWeight:600,color:'var(--g600)',marginBottom:4,textTransform:'uppercase',letterSpacing:'.06em'}}>{label}{required&&<span style={{color:'#EF4444',marginLeft:2}}>*</span>}</label>}
+    <div style={{position:'relative'}}>
+      {prefix&&<span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--g400)',fontSize:14,pointerEvents:'none'}}>{prefix}</span>}
+      {rows?<textarea value={value} onChange={e=>onChange(e.target.value)} rows={rows} placeholder={placeholder}
+        style={{...base,paddingLeft:prefix?'28px':'12px',resize:'vertical'}} />:
+        <input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
+          style={{...base,paddingLeft:prefix?'28px':'12px'}} />}
+    </div>
+  </div>;
+}
+
+function Sel({label,value,onChange,options,style={}}){
+  return<div style={{marginBottom:14,...style}}>
+    {label&&<label style={{display:'block',fontSize:11,fontWeight:600,color:'var(--g600)',marginBottom:4,textTransform:'uppercase',letterSpacing:'.06em'}}>{label}</label>}
+    <select value={value} onChange={e=>onChange(e.target.value)}
+      style={{width:'100%',padding:'8px 12px',border:'1px solid var(--g200)',borderRadius:'var(--r-sm)',fontSize:14,background:'#fff',color:'var(--g800)'}}>
+      {options.map(o=><option key={o.v??o} value={o.v??o}>{o.l??o}</option>)}
+    </select>
+  </div>;
+}
+
+function SHead({title,sub,action}){
+  return<div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',marginBottom:24}}>
+    <div>
+      <h2 className="serif" style={{fontSize:28,fontWeight:700,color:'var(--navy)',lineHeight:1.1,letterSpacing:'-.01em'}}>{title}</h2>
+      {sub&&<p style={{fontSize:13,color:'var(--g500)',marginTop:4}}>{sub}</p>}
+    </div>
+    {action}
+  </div>;
+}
+
+function Modal({title,onClose,children,wide}){
+  return<div style={{position:'fixed',inset:0,background:'rgba(7,16,38,.55)',display:'flex',alignItems:'center',
+    justifyContent:'center',zIndex:1000,padding:20,backdropFilter:'blur(3px)'}}>
+    <div style={{background:'#fff',borderRadius:'var(--r-lg)',width:wide?'min(920px,96vw)':'min(540px,96vw)',
+      maxHeight:'90vh',overflow:'auto',boxShadow:'var(--shadow-lg)',animation:'fadeIn .2s ease'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'18px 26px',
+        borderBottom:'1px solid var(--g200)',position:'sticky',top:0,background:'#fff',zIndex:2}}>
+        <h2 className="serif" style={{fontSize:20,fontWeight:700,color:'var(--navy)'}}>{title}</h2>
+        <button onClick={onClose} style={{background:'none',border:'none',fontSize:18,cursor:'pointer',
+          color:'var(--g400)',padding:'2px 6px',borderRadius:4,lineHeight:1}}>✕</button>
+      </div>
+      <div style={{padding:'22px 26px'}}>{children}</div>
+    </div>
+  </div>;
+}
+
+function Stat({label,value,icon,bg,c,anim}){
+  return<Card className={anim} style={{display:'flex',alignItems:'center',gap:14,animation:`fadeIn .4s ${anim||0}s ease both`}}>
+    <div style={{width:46,height:46,borderRadius:10,background:bg||'var(--navy-faint)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0}}>{icon}</div>
+    <div>
+      <div className="serif" style={{fontSize:24,fontWeight:700,color:c||'var(--navy)',lineHeight:1}}>{value}</div>
+      <div style={{fontSize:12,color:'var(--g500)',marginTop:3}}>{label}</div>
+    </div>
+  </Card>;
+}
+
+function TRow({k,v,sub,mono}){
+  return<div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',padding:'8px 0',borderBottom:'1px solid var(--g50)',fontSize:13}}>
+    <div><span style={{color:'var(--g600)'}}>{k}</span>{sub&&<div style={{fontSize:11,color:'#059669',marginTop:1}}>{sub}</div>}</div>
+    <span className={mono?'mono':undefined} style={{fontWeight:600,color:v&&v!=='—'?'var(--g800)':'var(--g400)',marginLeft:12,textAlign:'right'}}>{v||'—'}</span>
+  </div>;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SIDEBAR
+// ═══════════════════════════════════════════════════════════════
+const NAV=[
+  {id:'dashboard',icon:'◈',label:'Dashboard'},
+  {id:'matters',icon:'⚖',label:'Matters'},
+  {id:'calc',icon:'⊞',label:'Calculators'},
+  {id:'clients',icon:'◎',label:'Clients'},
+  {id:'checklist',icon:'☑',label:'Checklists'},
+  {id:'deadlines',icon:'◷',label:'Deadlines'},
+  {id:'rates',icon:'⊛',label:'Rate Cards'},
+];
+function Sidebar({view,onNav,badges}){
+  return<div style={{width:220,background:'var(--navy-dark)',height:'100vh',display:'flex',flexDirection:'column',
+    flexShrink:0,borderRight:'1px solid rgba(255,255,255,.04)'}}>
+    <div style={{padding:'24px 20px 20px',borderBottom:'1px solid rgba(255,255,255,.07)'}}>
+      <div className="serif" style={{color:'var(--gold)',fontSize:20,fontWeight:700,letterSpacing:'.02em',lineHeight:1.2}}>ConveyPro SA</div>
+      <div style={{color:'rgba(170,186,222,.6)',fontSize:10,marginTop:3,letterSpacing:'.12em',textTransform:'uppercase'}}>Legal Practice Suite</div>
+      <div style={{marginTop:10,padding:'6px 10px',background:'rgba(201,168,76,.1)',borderRadius:'var(--r-sm)',border:'1px solid rgba(201,168,76,.2)'}}>
+        <div style={{fontSize:10,color:'var(--gold)',fontWeight:600,letterSpacing:'.06em'}}>TANNERS & ASSOCIATES</div>
+        <div style={{fontSize:10,color:'rgba(170,186,222,.5)',marginTop:1}}>Est. 1983 · 40+ Years</div>
+      </div>
+    </div>
+    <nav style={{flex:1,padding:'10px 0',overflowY:'auto'}}>
+      {NAV.map(({id,icon,label})=>{
+        const active=view===id;const badge=badges[id];
+        return<button key={id} onClick={()=>onNav(id)} style={{
+          display:'flex',alignItems:'center',gap:10,width:'100%',padding:'10px 18px',border:'none',
+          cursor:'pointer',textAlign:'left',transition:'all .15s',background:active?'rgba(201,168,76,.13)':'transparent',
+          color:active?'var(--gold)':'rgba(170,186,222,.7)',borderLeft:active?'3px solid var(--gold)':'3px solid transparent',
+          fontWeight:active?600:400,fontSize:14}}>
+          <span style={{fontSize:16,width:22,textAlign:'center',flexShrink:0,opacity:active?1:.8}}>{icon}</span>
+          <span style={{flex:1}}>{label}</span>
+          {badge>0&&<span style={{background:'var(--gold)',color:'var(--navy)',fontSize:10,fontWeight:700,borderRadius:10,padding:'1px 7px',minWidth:18,textAlign:'center'}}>{badge}</span>}
+        </button>;
+      })}
+    </nav>
+    <div style={{padding:'14px 18px',borderTop:'1px solid rgba(255,255,255,.06)'}}>
+      <div style={{color:'rgba(170,186,222,.6)',fontSize:10,lineHeight:1.7}}>
+        <div>wayne@tanners.co.za</div>
+        <div>011 783 0148</div>
+        <div>www.tanners.co.za</div>
+      </div>
+    </div>
+  </div>;
+}
+
+// ─── Top Bar ──────────────────────────────────────────────────
+const VIEW_TITLES={dashboard:'Dashboard',matters:'Matters',calc:'Calculators',clients:'Client Database',checklist:'Document Checklists',deadlines:'Deadlines & Calendar',rates:'Rate Cards'};
+function TopBar({view}){
+  const d=new Date().toLocaleDateString('en-ZA',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  return<div style={{background:'#fff',borderBottom:'1px solid var(--g200)',padding:'0 28px',height:58,
+    display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,boxShadow:'var(--shadow)'}}>
+    <div className="serif" style={{fontSize:17,color:'var(--navy)',fontWeight:700,letterSpacing:'-.01em'}}>{VIEW_TITLES[view]||'ConveyPro SA'}</div>
+    <div style={{display:'flex',alignItems:'center',gap:18}}>
+      <div style={{fontSize:12,color:'var(--g400)'}}>{d}</div>
+      <div style={{display:'flex',alignItems:'center',gap:9}}>
+        <div style={{width:34,height:34,borderRadius:'50%',background:'var(--navy)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold)',fontSize:11,fontWeight:700,letterSpacing:'.05em'}}>T&amp;A</div>
+        <div><div style={{fontSize:13,fontWeight:600,color:'var(--g800)'}}>Tanners &amp; Associates</div>
+          <div style={{fontSize:11,color:'var(--g400)'}}>Conveyancing &amp; Property Law</div>
+        </div>
+      </div>
+    </div>
+  </div>;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+function Dashboard({matters,clients,onNav}){
+  const{active,pending,registered,totalValue}=useMemo(()=>({
+    active:matters.filter(m=>m.status==='Active').length,
+    pending:matters.filter(m=>['Pending Docs','Awaiting Bond'].includes(m.status)).length,
+    registered:matters.filter(m=>m.status==='Registered').length,
+    totalValue:matters.reduce((s,m)=>s+(m.purchasePrice||0),0),
+  }),[matters]);
+  const recent=useMemo(()=>[...matters].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).slice(0,5),[matters]);
+  const upcoming=useMemo(()=>matters.filter(m=>m.registrationDate&&new Date(m.registrationDate)>=new Date()).sort((a,b)=>new Date(a.registrationDate)-new Date(b.registrationDate)).slice(0,5),[matters]);
+  return<div className="anim">
+    <SHead title="Welcome back" sub="Your conveyancing portfolio at a glance"
+      action={<Btn onClick={()=>onNav('matters')} variant="navy">+ New Matter</Btn>}/>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:16,marginBottom:28}}>
+      <Stat label="Active Matters" value={active} icon="⚖" bg="var(--navy-faint)" c="var(--navy)" />
+      <Stat label="Pending Action" value={pending} icon="⏳" bg="var(--amber-bg)" c="var(--amber)" />
+      <Stat label="Registered" value={registered} icon="✓" bg="var(--green-bg)" c="var(--green)" />
+      <Stat label="Portfolio Value" value={fmtS(totalValue)} icon="⊛" bg="var(--gold-pale)" c="#7A5200" />
+    </div>
+    <div style={{display:'grid',gridTemplateColumns:'1.6fr 1fr',gap:20}}>
+      <Card>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+          <h3 style={{fontSize:14,fontWeight:700,color:'var(--navy)'}}>Recent Matters</h3>
+          <Btn size="sm" variant="ghost" onClick={()=>onNav('matters')}>View All →</Btn>
+        </div>
+        {recent.length===0?<div style={{textAlign:'center',padding:'32px 0',color:'var(--g400)',fontSize:13}}>
+          No matters yet — <span style={{color:'var(--gold)',cursor:'pointer',fontWeight:600}} onClick={()=>onNav('matters')}>create your first matter</span>
+        </div>:recent.map(m=><div key={m.id} style={{display:'flex',alignItems:'center',gap:12,padding:'9px 0',borderBottom:'1px solid var(--g50)'}}>
+          <div style={{width:36,height:36,borderRadius:8,background:'var(--navy)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'var(--gold)',fontWeight:700,flexShrink:0}}>
+            {(m.reference||'M').slice(0,2).toUpperCase()}</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:700,color:'var(--navy)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.reference}</div>
+            <div style={{fontSize:11,color:'var(--g400)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.propertyDesc||'—'}</div>
+          </div>
+          <div style={{textAlign:'right',flexShrink:0}}><Pill label={m.status}/><div style={{fontSize:11,color:'var(--g400)',marginTop:2}}>{fmtR(m.purchasePrice)}</div></div>
+        </div>)}
+      </Card>
+      <div style={{display:'flex',flexDirection:'column',gap:16}}>
+        <Card style={{flex:1}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+            <h3 style={{fontSize:14,fontWeight:700,color:'var(--navy)'}}>Upcoming Deadlines</h3>
+            <Btn size="sm" variant="ghost" onClick={()=>onNav('deadlines')}>All</Btn>
+          </div>
+          {upcoming.length===0?<div style={{textAlign:'center',padding:'20px 0',color:'var(--g400)',fontSize:13}}>No upcoming deadlines</div>
+            :upcoming.map(m=>{const d=new Date(m.registrationDate+'T00:00:00');const days=Math.ceil((d-new Date())/86400000);
+              return<div key={m.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid var(--g50)'}}>
+                <div style={{width:38,height:38,borderRadius:8,background:days<=3?'var(--red-bg)':days<=7?'var(--amber-bg)':'var(--green-bg)',
+                  display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                  <div style={{fontSize:15,fontWeight:700,lineHeight:1,color:days<=3?'var(--red)':days<=7?'var(--amber)':'var(--green)'}}>{d.getDate()}</div>
+                  <div style={{fontSize:8,fontWeight:600,color:days<=3?'var(--red)':days<=7?'var(--amber)':'var(--green)'}}>{d.toLocaleString('en-ZA',{month:'short'}).toUpperCase()}</div>
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:700,color:'var(--g800)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.reference}</div>
+                  <div style={{fontSize:11,color:'var(--g400)'}}>Registration target</div>
+                </div>
+                <div style={{fontSize:13,fontWeight:700,color:days<=3?'#DC2626':days<=7?'#D97706':'#059669',flexShrink:0}}>{days}d</div>
+              </div>;})}
+        </Card>
+        <Card>
+          <div style={{fontSize:11,fontWeight:700,color:'var(--g400)',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:10}}>Quick Actions</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+            {[['💰 Calculate','calc'],['📋 Checklist','checklist'],['⚖ Matters','matters'],['⊛ Rate Cards','rates']].map(([l,v])=>(
+              <Btn key={v} size="sm" full variant={v==='calc'?'navy':'ghost'} onClick={()=>onNav(v)}>{l}</Btn>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </div>
+  </div>;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MATTERS
+// ═══════════════════════════════════════════════════════════════
+const MTYPES=['Transfer','Bond Registration','Bond Cancellation','Sectional Title Transfer','Estate Transfer','Divorce Transfer','Partition','New Development Transfer'];
+const STATUSES=Object.keys(STATUS);
+const BM=()=>({reference:'',type:'Transfer',status:'Active',purchasePrice:'',bondAmount:'',propertyDesc:'',erfNumber:'',titleDeedNo:'',buyerName:'',sellerName:'',agentName:'',agentComm:'',lodgementDate:'',registrationDate:'',occupationDate:'',sectionalTitle:false,newDevelopment:false,notes:'',createdAt:today()});
+
+function Matters({matters,saveMatters}){
+  const[form,setForm]=useState(null);const[search,setSearch]=useState('');const[filter,setFilter]=useState('All');const[detail,setDetail]=useState(null);
+  const sf=(k,v)=>setForm(p=>({...p,[k]:v}));
+  const filtered=useMemo(()=>matters.filter(m=>{const q=search.toLowerCase();const mq=!q||[m.reference,m.propertyDesc,m.buyerName,m.sellerName].some(s=>s?.toLowerCase().includes(q));return mq&&(filter==='All'||m.status===filter);}),[matters,search,filter]);
+  function save(){if(!form.reference)return alert('Matter reference is required.');const m={...form,id:form.id||uid(),purchasePrice:num(form.purchasePrice),bondAmount:num(form.bondAmount),agentComm:num(form.agentComm),updatedAt:today()};saveMatters(form.id?matters.map(x=>x.id===m.id?m:x):[...matters,m]);setForm(null);}
+  function del(id){if(confirm('Delete this matter permanently? This cannot be undone.'))saveMatters(matters.filter(m=>m.id!==id));}
+  function editM(m){setForm({...m,purchasePrice:String(m.purchasePrice||''),bondAmount:String(m.bondAmount||''),agentComm:String(m.agentComm||'')});setDetail(null);}
+
+  if(detail){const m=matters.find(x=>x.id===detail);if(!m){setDetail(null);return null;}
+    const c=calcBuyer(m.purchasePrice,m.bondAmount,m.newDevelopment);
+    return<MatterDetail m={m} c={c} onBack={()=>setDetail(null)} onEdit={()=>editM(m)} onDel={()=>{del(m.id);setDetail(null);}}/>;
+  }
+
+  return<div className="anim">
+    <SHead title="Matters" sub={`${matters.length} total · ${matters.filter(m=>m.status==='Active').length} active`}
+      action={<Btn variant="navy" onClick={()=>setForm(BM())}>+ New Matter</Btn>}/>
+    <Card style={{marginBottom:18,padding:'12px 18px'}}>
+      <div style={{display:'flex',gap:10,alignItems:'center'}}>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search matters, properties, parties..."
+          style={{flex:1,padding:'8px 14px',border:'1px solid var(--g200)',borderRadius:'var(--r-sm)',fontSize:13}}/>
+        <select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:'8px 12px',border:'1px solid var(--g200)',borderRadius:'var(--r-sm)',fontSize:13,background:'#fff',flexShrink:0}}>
+          <option value="All">All Statuses</option>{STATUSES.map(s=><option key={s}>{s}</option>)}
+        </select>
+      </div>
+    </Card>
+    {filtered.length===0?<Card style={{textAlign:'center',padding:52}}>
+      <div style={{fontSize:40,marginBottom:10}}>⚖</div>
+      <div style={{fontSize:16,color:'var(--g700)',fontWeight:600}}>No matters found</div>
+      <div style={{fontSize:13,color:'var(--g400)',marginTop:4}}>Adjust your search or create a new matter</div>
+    </Card>:
+    <div style={{display:'flex',flexDirection:'column',gap:10}}>
+      {filtered.map(m=>{const c=calcBuyer(m.purchasePrice||0,m.bondAmount||0,m.newDevelopment);
+        return<Card key={m.id} hover onClick={()=>setDetail(m.id)}>
+          <div style={{display:'flex',alignItems:'center',gap:14}}>
+            <div style={{width:46,height:46,borderRadius:9,background:'var(--navy)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold)',fontSize:13,fontWeight:700,flexShrink:0}}>
+              {(m.reference||'M').slice(0,2).toUpperCase()}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:3}}>
+                <span style={{fontSize:15,fontWeight:700,color:'var(--navy)'}}>{m.reference}</span>
+                <Pill label={m.status}/>
+                <span style={{fontSize:11,color:'var(--g400)',background:'var(--g50)',padding:'2px 8px',borderRadius:4}}>{m.type}</span>
+              </div>
+              <div style={{fontSize:12,color:'var(--g500)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.propertyDesc||'No property description'}</div>
+              <div style={{fontSize:11,color:'var(--g400)',marginTop:2}}>{[m.buyerName&&'Buyer: '+m.buyerName,m.sellerName&&'Seller: '+m.sellerName,m.purchasePrice&&fmtR(m.purchasePrice)].filter(Boolean).join(' · ')}</div>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:10,flexShrink:0}} onClick={e=>e.stopPropagation()}>
+              <div style={{textAlign:'right'}}>
+                <div className="mono" style={{fontSize:14,fontWeight:600,color:'var(--navy)'}}>{fmtR(c.total)}</div>
+                <div style={{fontSize:10,color:'var(--g400)'}}>Est. buyer costs</div>
+              </div>
+              <Btn size="sm" variant="ghost" onClick={()=>editM(m)}>✎</Btn>
+              <Btn size="sm" variant="danger" onClick={()=>del(m.id)}>✕</Btn>
+            </div>
+          </div>
+        </Card>;
+      })}
+    </div>}
+    {form&&<Modal title={form.id?'Edit Matter':'New Matter'} onClose={()=>setForm(null)} wide>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 22px'}}>
+        <Inp label="Reference *" required value={form.reference} onChange={v=>sf('reference',v)} placeholder="e.g. T 2024/001"/>
+        <Sel label="Matter Type" value={form.type} onChange={v=>sf('type',v)} options={MTYPES}/>
+        <Sel label="Status" value={form.status} onChange={v=>sf('status',v)} options={STATUSES}/>
+        <Inp label="Purchase Price" type="number" prefix="R" value={form.purchasePrice} onChange={v=>sf('purchasePrice',v)} placeholder="0"/>
+        <Inp label="Bond Amount" type="number" prefix="R" value={form.bondAmount} onChange={v=>sf('bondAmount',v)} placeholder="0 if cash"/>
+        <Inp label="Est. Agent Commission" type="number" prefix="R" value={form.agentComm} onChange={v=>sf('agentComm',v)} placeholder="0"/>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'0 22px'}}>
+        <Inp label="Buyer Name" value={form.buyerName} onChange={v=>sf('buyerName',v)}/>
+        <Inp label="Seller Name" value={form.sellerName} onChange={v=>sf('sellerName',v)}/>
+        <Inp label="ERF / Unit No." value={form.erfNumber} onChange={v=>sf('erfNumber',v)}/>
+      </div>
+      <Inp label="Property Description" value={form.propertyDesc} onChange={v=>sf('propertyDesc',v)} placeholder="e.g. Erf 1234, Waterkloof, Pretoria"/>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'0 22px'}}>
+        <Inp label="Lodgement Date" type="date" value={form.lodgementDate} onChange={v=>sf('lodgementDate',v)}/>
+        <Inp label="Registration Date" type="date" value={form.registrationDate} onChange={v=>sf('registrationDate',v)}/>
+        <Inp label="Occupation Date" type="date" value={form.occupationDate} onChange={v=>sf('occupationDate',v)}/>
+      </div>
+      <div style={{display:'flex',gap:20,marginBottom:14,padding:'11px 14px',background:'var(--g50)',borderRadius:'var(--r-sm)'}}>
+        {[['sectionalTitle','Sectional Title'],['newDevelopment','New Development (VAT applies, no transfer duty)']].map(([k,l])=>(
+          <label key={k} style={{display:'flex',alignItems:'center',gap:8,fontSize:13,cursor:'pointer'}}>
+            <input type="checkbox" checked={form[k]||false} onChange={e=>sf(k,e.target.checked)}/>{l}
+          </label>
+        ))}
+      </div>
+      <Inp label="Notes" value={form.notes} onChange={v=>sf('notes',v)} rows={2} placeholder="Special conditions, remarks..."/>
+      <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:8}}>
+        <Btn variant="ghost" onClick={()=>setForm(null)}>Cancel</Btn>
+        <Btn variant="navy" onClick={save}>{form.id?'Save Changes':'Create Matter'}</Btn>
+      </div>
+    </Modal>}
+  </div>;
+}
+
+function MatterDetail({m,c,onBack,onEdit,onDel}){
+  const[tab,setTab]=useState('overview');
+  const TABS=[{id:'overview',l:'Overview'},{id:'costs',l:'Cost Summary'},{id:'timeline',l:'Timeline'}];
+  return<div className="anim">
+    <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:20}}>
+      <Btn size="sm" variant="ghost" onClick={onBack}>← Back</Btn>
+      <h2 className="serif" style={{flex:1,fontSize:22,color:'var(--navy)',fontWeight:700}}>{m.reference}</h2>
+      <Pill label={m.status}/>
+      <Btn size="sm" variant="ghost" onClick={onEdit}>✎ Edit</Btn>
+      <Btn size="sm" variant="danger" onClick={onDel}>Delete</Btn>
+    </div>
+    <div style={{display:'flex',borderBottom:'2px solid var(--g200)',marginBottom:22}}>
+      {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{padding:'9px 22px',border:'none',background:'transparent',
+        cursor:'pointer',fontSize:14,fontWeight:600,color:tab===t.id?'var(--gold)':'var(--g500)',
+        borderBottom:tab===t.id?'2px solid var(--gold)':'2px solid transparent',marginBottom:-2,transition:'all .15s'}}>{t.l}</button>)}
+    </div>
+    {tab==='overview'&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+      <Card>
+        <h3 style={{fontSize:11,fontWeight:700,color:'var(--g500)',marginBottom:14,textTransform:'uppercase',letterSpacing:'.07em'}}>Property Details</h3>
+        {[['Description',m.propertyDesc||'—'],['ERF / Unit',m.erfNumber||'—'],['Title Deed No.',m.titleDeedNo||'—'],['Matter Type',m.type],['Sectional Title',m.sectionalTitle?'Yes':'No'],['New Development',m.newDevelopment?'Yes (VAT applies)':'No']].map(([k,v])=><TRow key={k} k={k} v={v}/>)}
+      </Card>
+      <Card>
+        <h3 style={{fontSize:11,fontWeight:700,color:'var(--g500)',marginBottom:14,textTransform:'uppercase',letterSpacing:'.07em'}}>Parties &amp; Financials</h3>
+        {[['Buyer',m.buyerName||'—'],['Seller',m.sellerName||'—'],['Purchase Price',fmtR(m.purchasePrice||0)],['Bond Amount',m.bondAmount?fmtR(m.bondAmount):'None'],['Agent',m.agentName||'—'],['Agent Commission',m.agentComm?fmtR(m.agentComm):'—']].map(([k,v])=><TRow key={k} k={k} v={v}/>)}
+      </Card>
+      {m.notes&&<Card style={{gridColumn:'1/-1'}}><h3 style={{fontSize:11,fontWeight:700,color:'var(--g500)',marginBottom:8,textTransform:'uppercase',letterSpacing:'.07em'}}>Notes</h3><p style={{fontSize:13,color:'var(--g600)',lineHeight:1.7}}>{m.notes}</p></Card>}
+    </div>}
+    {tab==='costs'&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+      <Card>
+        <h3 style={{fontSize:11,fontWeight:700,color:'var(--g500)',marginBottom:14,textTransform:'uppercase',letterSpacing:'.07em'}}>Transfer Costs</h3>
+        {[['Transfer Duty (SARS)',m.newDevelopment?'Exempt':fmtR(c.td),m.newDevelopment?'New development — VAT applies':null],['Conveyancing Fee',fmtR(c.cf)],['VAT @ 15%',fmtR(c.cfV)],['Deeds Office Fee',fmtR(c.df)],['Post, Petties &amp; FICA',fmtR(c.pm)]].map(([k,v,sub])=><TRow key={k} k={k} v={v} sub={sub} mono/>)}
+      </Card>
+      <Card>
+        <h3 style={{fontSize:11,fontWeight:700,color:'var(--g500)',marginBottom:14,textTransform:'uppercase',letterSpacing:'.07em'}}>Bond Registration Costs</h3>
+        {m.bondAmount>0?[['Bond Attorney Fee',fmtR(c.bf)],['VAT @ 15%',fmtR(c.bfV)],['Deeds Office (Bond)',fmtR(c.bdf)],['Post, Petties',fmtR(c.bpm)]].map(([k,v])=><TRow key={k} k={k} v={v} mono/>)
+          :<div style={{color:'var(--g400)',fontSize:13,padding:'24px 0',textAlign:'center'}}>No bond registered for this matter</div>}
+      </Card>
+      <div style={{gridColumn:'1/-1',background:'var(--navy)',borderRadius:'var(--r)',padding:'16px 24px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <span style={{color:'rgba(170,186,222,.8)',fontSize:14,fontWeight:600,letterSpacing:'.02em'}}>Total Estimated Buyer Costs</span>
+        <span className="serif mono" style={{color:'var(--gold)',fontSize:26,fontWeight:700}}>{fmtR(c.total)}</span>
+      </div>
+    </div>}
+    {tab==='timeline'&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+      <Card>
+        <h3 style={{fontSize:11,fontWeight:700,color:'var(--g500)',marginBottom:14,textTransform:'uppercase',letterSpacing:'.07em'}}>Key Dates</h3>
+        {[['Matter Created',fmtD(m.createdAt)],['Lodgement Date',fmtD(m.lodgementDate)],['Registration Date',fmtD(m.registrationDate)],['Occupation Date',fmtD(m.occupationDate)]].map(([k,v])=><TRow key={k} k={k} v={v}/>)}
+      </Card>
+      <Card>
+        <h3 style={{fontSize:11,fontWeight:700,color:'var(--g500)',marginBottom:14,textTransform:'uppercase',letterSpacing:'.07em'}}>Progress Tracker</h3>
+        {[['Instruction Received',true],['FICA Completed',!['Active'].includes(m.status)],['Bond Approved',!['Active','Awaiting Bond','Pending Docs'].includes(m.status)],['Rates &amp; Levy Clearance',['Lodged','Registered'].includes(m.status)],['Documents Lodged',['Lodged','Registered'].includes(m.status)],['Registered at Deeds',m.status==='Registered']].map(([l,done])=>(
+          <div key={l} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid var(--g50)'}}>
+            <div style={{width:22,height:22,borderRadius:'50%',background:done?'var(--green-bg)':'var(--g100)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,flexShrink:0,border:done?'1.5px solid var(--green)':'1.5px solid var(--g200)',color:done?'var(--green)':'var(--g300)'}}>{done?'✓':''}</div>
+            <span style={{fontSize:13,color:done?'var(--g800)':'var(--g400)',fontWeight:done?600:400}}>{l}</span>
+          </div>
+        ))}
+      </Card>
+    </div>}
+  </div>;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CALCULATORS
+// ═══════════════════════════════════════════════════════════════
+function Calculators(){
+  const[tab,setTab]=useState('full');
+  const TABS=[{id:'full',l:'Full Transaction'},{id:'duty',l:'Transfer Duty'},{id:'fees',l:'Attorney Fees'},{id:'seller',l:'Seller Costs'}];
+  return<div className="anim">
+    <SHead title="Cost Calculators" sub="SARS &amp; GFC approved rates · 2024/2025 tax year"/>
+    <div style={{display:'flex',gap:4,marginBottom:24,background:'#fff',border:'1px solid var(--g200)',borderRadius:8,padding:4,width:'fit-content',boxShadow:'var(--shadow)'}}>
+      {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{padding:'7px 18px',border:'none',cursor:'pointer',fontSize:13,fontWeight:600,borderRadius:6,background:tab===t.id?'var(--navy)':'transparent',color:tab===t.id?'var(--gold)':'var(--g500)',transition:'all .15s'}}>{t.l}</button>)}
+    </div>
+    {tab==='full'&&<FullCalc/>}{tab==='duty'&&<DutyCalc/>}{tab==='fees'&&<FeesCalc/>}{tab==='seller'&&<SellerCalc/>}
+  </div>;
+}
+
+function CostRow({k,v,sub,total,exempt}){
+  return<div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',padding:'9px 0',borderBottom:'1px solid var(--g50)',fontSize:13,...(total?{marginTop:8,borderTop:'1px solid var(--g200)'}:{})}}>
+    <div><span style={{color:total?'var(--g700)':'var(--g600)',fontWeight:total?600:400}}>{k}</span>{sub&&<div style={{fontSize:11,color:'#059669',marginTop:1}}>{sub}</div>}</div>
+    <span className="mono" style={{fontWeight:total?700:600,color:exempt?'#059669':total?'var(--navy)':'var(--g800)',fontSize:total?15:13,marginLeft:12}}>{exempt?'Exempt':v}</span>
+  </div>;
+}
+
+function FullCalc(){
+  const[pp,setPP]=useState('');const[bond,setBond]=useState('');const[newDev,setND]=useState(false);
+  const p=num(pp),b=num(bond);const c=useMemo(()=>calcBuyer(p,b,newDev),[p,b,newDev]);
+  return<div style={{display:'grid',gridTemplateColumns:'1fr 1.4fr',gap:24}}>
+    <div style={{display:'flex',flexDirection:'column',gap:16}}>
+      <Card>
+        <h3 style={{fontSize:14,fontWeight:700,color:'var(--navy)',marginBottom:16}}>Property Details</h3>
+        <Inp label="Purchase Price" type="number" prefix="R" value={pp} onChange={setPP} placeholder="e.g. 1 500 000"/>
+        <Inp label="Bond Amount" type="number" prefix="R" value={bond} onChange={setBond} placeholder="Leave blank if cash purchase"/>
+        <div style={{padding:'10px 13px',background:'var(--g50)',borderRadius:'var(--r-sm)',marginTop:4}}>
+          <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,cursor:'pointer'}}>
+            <input type="checkbox" checked={newDev} onChange={e=>setND(e.target.checked)}/>New development (VAT applies — no transfer duty)</label>
+        </div>
+        {p>0&&<div style={{marginTop:14,padding:'12px',background:'var(--gold-pale)',borderRadius:'var(--r-sm)',border:'1px solid var(--gold-pale2)'}}>
+          <div style={{fontSize:10,color:'#7A5200',fontWeight:700,textTransform:'uppercase',letterSpacing:'.07em',marginBottom:7}}>Quick Summary</div>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:4}}>
+            <span style={{color:'#7A5200'}}>PP + All Costs</span><strong className="mono" style={{color:'var(--navy)'}}>{fmtR(p+c.total)}</strong>
+          </div>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:12}}>
+            <span style={{color:'#9B6C00'}}>Costs as % of PP</span><strong style={{color:'#7A5200'}}>{p>0?((c.total/p)*100).toFixed(1):0}%</strong>
+          </div>
+        </div>}
+      </Card>
+    </div>
+    <Card>
+      <h3 style={{fontSize:14,fontWeight:700,color:'var(--navy)',marginBottom:16}}>Buyer Cost Breakdown</h3>
+      {p===0?<div style={{textAlign:'center',padding:'40px 0',color:'var(--g400)',fontSize:13}}>Enter a purchase price to calculate costs</div>:
+      <>
+        <CostRow k="Transfer Duty (SARS)" v={fmtR(c.td)} exempt={newDev} sub={newDev?'New development — VAT applies instead':null}/>
+        <CostRow k="Conveyancing Fee (excl. VAT)" v={fmtR(c.cf)}/>
+        <CostRow k="VAT @ 15% on Conv. Fee" v={fmtR(c.cfV)}/>
+        <CostRow k="Deeds Office Fee" v={fmtR(c.df)}/>
+        <CostRow k="Post, Petties &amp; FICA" v={fmtR(c.pm)}/>
+        {b>0&&<>
+          <div style={{fontSize:11,color:'var(--purple)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.07em',marginTop:10,marginBottom:4,borderLeft:'2px solid var(--purple)',paddingLeft:8}}>Bond Registration</div>
+          <CostRow k="Bond Attorney Fee (excl. VAT)" v={fmtR(c.bf)}/>
+          <CostRow k="VAT @ 15% on Bond Fee" v={fmtR(c.bfV)}/>
+          <CostRow k="Deeds Office (Bond)" v={fmtR(c.bdf)}/>
+          <CostRow k="Post, Petties (Bond)" v={fmtR(c.bpm)}/>
+        </>}
+        <div style={{marginTop:16,padding:'14px 18px',background:'var(--navy)',borderRadius:'var(--r)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <span style={{color:'rgba(170,186,222,.8)',fontSize:13,fontWeight:600,letterSpacing:'.02em'}}>TOTAL BUYER COSTS</span>
+          <span className="serif" style={{color:'var(--gold)',fontSize:22,fontWeight:700}}>{fmtR(c.total)}</span>
+        </div>
+        <div style={{marginTop:8,padding:'9px 12px',background:'var(--navy-faint)',borderRadius:'var(--r-sm)',fontSize:11,color:'var(--g600)'}}>
+          ⓘ Estimates based on GFC approved tariff &amp; SARS 2024/2025 rates. Rates clearance, levies &amp; agent commission excluded.
+        </div>
+      </>}
+    </Card>
+  </div>;
+}
+
+function DutyCalc(){
+  const[price,setP]=useState('');const p=num(price);const duty=calcTD(p);
+  const bi=TD.findIndex(b=>p>=b.from&&p<=b.to);
+  return<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:24}}>
+    <div>
+      <Card style={{marginBottom:16}}>
+        <h3 style={{fontSize:14,fontWeight:700,color:'var(--navy)',marginBottom:16}}>Transfer Duty Calculator</h3>
+        <Inp label="Property Purchase Price" type="number" prefix="R" value={price} onChange={setP} placeholder="0"/>
+        {p>0&&<div style={{textAlign:'center',padding:'24px',background:'var(--navy)',borderRadius:'var(--r)',marginTop:4}}>
+          <div style={{color:'rgba(170,186,222,.7)',fontSize:10,textTransform:'uppercase',letterSpacing:'.12em',marginBottom:8}}>Transfer Duty Payable (SARS)</div>
+          <div className="serif" style={{color:'var(--gold)',fontSize:32,fontWeight:700}}>{fmtR(duty)}</div>
+          {duty===0&&<div style={{color:'#4ade80',fontSize:12,marginTop:6}}>✓ Below duty threshold — R1.1M exemption</div>}
+          {duty>0&&<div style={{color:'rgba(170,186,222,.6)',fontSize:12,marginTop:6}}>{((duty/p)*100).toFixed(2)}% effective rate</div>}
+        </div>}
+      </Card>
+    </div>
+    <Card>
+      <h3 style={{fontSize:14,fontWeight:700,color:'var(--navy)',marginBottom:6}}>2024/2025 Transfer Duty Scale</h3>
+      <p style={{fontSize:11,color:'var(--g400)',marginBottom:14}}>SARS — effective 1 March 2024. Highlighted row shows your entered value.</p>
+      <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+        <thead><tr style={{background:'var(--g50)'}}>{['Property Value','Duty Payable'].map(h=><th key={h} style={{textAlign:'left',padding:'8px 10px',fontWeight:700,color:'var(--g700)',borderBottom:'2px solid var(--g200)'}}>{h}</th>)}</tr></thead>
+        <tbody>{[['R0 – R1,100,000','0% (exempt)'],['R1,100,001 – R1,512,500','3% on amount above R1,100,000'],['R1,512,501 – R2,117,500','R12,375 + 6% above R1,512,500'],['R2,117,501 – R2,722,500','R48,675 + 8% above R2,117,500'],['R2,722,501 – R12,100,000','R97,075 + 11% above R2,722,500'],['R12,100,001+','R1,128,600 + 13% above R12,100,000']].map(([r,d],i)=>(
+          <tr key={i} style={{background:bi===i?'var(--gold-pale)':'transparent'}}>
+            <td style={{padding:'8px 10px',borderBottom:'1px solid var(--g100)',color:'var(--g700)'}}>{r}</td>
+            <td className="mono" style={{padding:'8px 10px',borderBottom:'1px solid var(--g100)',fontWeight:600,color:bi===i?'#7A5200':'var(--navy)'}}>{d}</td>
+          </tr>
+        ))}</tbody>
+      </table>
+    </Card>
+  </div>;
+}
+
+function FeesCalc(){
+  const[val,setV]=useState('');const v=num(val);const fee=convFee(v),vat=Math.round(fee*.15),deeds=deedsFee(v);
+  return<div style={{display:'grid',gridTemplateColumns:'1fr 1.4fr',gap:24}}>
+    <Card>
+      <h3 style={{fontSize:14,fontWeight:700,color:'var(--navy)',marginBottom:16}}>Attorney Fee Estimator</h3>
+      <Inp label="Property / Bond Value" type="number" prefix="R" value={val} onChange={setV} placeholder="0"/>
+      {v>0&&<>
+        {[['Attorney Fee (excl. VAT)',fmtR(fee)],['VAT @ 15%',fmtR(vat)],['Attorney Fee (incl. VAT)',fmtR(fee+vat)],['Deeds Office Fee',fmtR(deeds)]].map(([l,n],i)=>(
+          <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'8px 12px',background:i===2?'var(--navy-faint)':i===3?'var(--g50)':'transparent',borderRadius:'var(--r-sm)',marginBottom:4}}>
+            <span style={{fontSize:13,color:'var(--g600)',fontWeight:i>=2?600:400}}>{l}</span>
+            <span className="mono" style={{fontSize:13,fontWeight:700,color:i===2?'var(--navy)':'var(--g800)'}}>{n}</span>
+          </div>
+        ))}
+        <div style={{marginTop:10,padding:'12px 14px',background:'var(--navy)',borderRadius:'var(--r)',display:'flex',justifyContent:'space-between'}}>
+          <span style={{color:'rgba(170,186,222,.8)',fontSize:13}}>Total (Fees + Deeds + VAT)</span>
+          <span className="serif" style={{color:'var(--gold)',fontWeight:700,fontSize:16}}>{fmtR(fee+vat+deeds)}</span>
+        </div>
+      </>}
+    </Card>
+    <Card>
+      <h3 style={{fontSize:14,fontWeight:700,color:'var(--navy)',marginBottom:8}}>GFC Approved Fee Scale (2024)</h3>
+      <p style={{fontSize:11,color:'var(--g400)',marginBottom:12}}>Conveyancing fees are regulated by the Government Fee Calculator (GFC) approved tariff. These are guidelines — actual fees may vary between practices.</p>
+      <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+        <thead><tr style={{background:'var(--g50)'}}>{['Value','Excl. VAT','Incl. VAT'].map(h=><th key={h} style={{textAlign:'left',padding:'6px 8px',fontWeight:700,color:'var(--g700)',borderBottom:'2px solid var(--g200)'}}>{h}</th>)}</tr></thead>
+        <tbody>{[[100000,5900],[200000,8250],[300000,10500],[400000,12600],[500000,14600],[600000,16400],[800000,19700],[1000000,22600],[1500000,28200],[2000000,33400],[3000000,43400],[5000000,59000]].map(([lim,f])=>(
+          <tr key={lim}><td style={{padding:'6px 8px',borderBottom:'1px solid var(--g100)'}}>{fmtS(lim)}</td>
+            <td className="mono" style={{padding:'6px 8px',borderBottom:'1px solid var(--g100)',fontWeight:600}}>{fmtR(f)}</td>
+            <td className="mono" style={{padding:'6px 8px',borderBottom:'1px solid var(--g100)',color:'var(--g500)'}}>{fmtR(Math.round(f*1.15))}</td>
+          </tr>
+        ))}</tbody>
+      </table>
+    </Card>
+  </div>;
+}
+
+function SellerCalc(){
+  const[pp,setPP]=useState('');const[bond,setB]=useState('');const[rate,setR]=useState('5.75');const[sect,setSect]=useState(false);
+  const p=num(pp),b=num(bond),r=num(rate)||5.75;
+  const comm=Math.round(p*r/100),commV=Math.round(comm*.15),bondCancel=b>0?Math.round(convFee(b)*.45+600):0;
+  const ratesAdv=p>0?2500:0,levyClear=sect?1500:0,elecCoC=p>0?1800:0;
+  const total=comm+commV+bondCancel+ratesAdv+levyClear+elecCoC;
+  const netProceeds=Math.max(0,p-total-b);
+  return<div style={{display:'grid',gridTemplateColumns:'1fr 1.3fr',gap:24}}>
+    <Card>
+      <h3 style={{fontSize:14,fontWeight:700,color:'var(--navy)',marginBottom:16}}>Seller Inputs</h3>
+      <Inp label="Selling Price" type="number" prefix="R" value={pp} onChange={setPP} placeholder="0"/>
+      <Inp label="Outstanding Bond Balance" type="number" prefix="R" value={bond} onChange={setB} placeholder="0 if cash"/>
+      <Inp label="Agent Commission (%)" type="number" value={rate} onChange={setR} placeholder="5.75"/>
+      <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,cursor:'pointer',marginTop:4}}>
+        <input type="checkbox" checked={sect} onChange={e=>setSect(e.target.checked)}/>Sectional title (levy clearance required)</label>
+    </Card>
+    <Card>
+      <h3 style={{fontSize:14,fontWeight:700,color:'var(--navy)',marginBottom:16}}>Seller Cost Breakdown</h3>
+      {p===0?<div style={{textAlign:'center',padding:'40px 0',color:'var(--g400)',fontSize:13}}>Enter the selling price to calculate</div>:
+      <>
+        {[['Agent Commission (excl. VAT)',fmtR(comm)],['VAT on Commission (15%)',fmtR(commV)],
+          ...(b>0?[['Bond Cancellation Fees (est.)',fmtR(bondCancel)]]:[[]]),[],
+          ['Rates Clearance Advance (est.)',fmtR(ratesAdv)],
+          ...(sect?[['Levy Clearance (est.)',fmtR(levyClear)]]:[[]]),[],
+          ['Electrical CoC (est.)',fmtR(elecCoC)]].filter(a=>a.length>0).map(([k,v])=>(
+          <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--g50)',fontSize:13}}>
+            <span style={{color:'var(--g600)'}}>{k}</span><span className="mono" style={{fontWeight:600,color:'var(--g800)'}}>{v}</span>
+          </div>
+        ))}
+        <div style={{marginTop:16,padding:'14px 18px',background:'var(--navy)',borderRadius:'var(--r)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <span style={{color:'rgba(170,186,222,.8)',fontSize:13,fontWeight:600}}>TOTAL SELLER COSTS (est.)</span>
+          <span className="serif" style={{color:'var(--gold)',fontSize:22,fontWeight:700}}>{fmtR(total)}</span>
+        </div>
+        <div style={{marginTop:12,padding:'12px 16px',background:'var(--green-bg)',borderRadius:'var(--r)',border:'1px solid #BBF7D0'}}>
+          <div style={{fontSize:12,fontWeight:700,color:'var(--green)'}}>Estimated Net Proceeds</div>
+          <div className="serif" style={{fontSize:22,fontWeight:700,color:'var(--navy)',marginTop:2}}>{fmtR(netProceeds)}</div>
+          <div style={{fontSize:11,color:'var(--green)',marginTop:2}}>After all costs and bond settlement</div>
+        </div>
+      </>}
+    </Card>
+  </div>;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLIENTS
+// ═══════════════════════════════════════════════════════════════
+const MARITAL=['Single','Married in COP','Married ANC','Married ANC + Accrual','Divorced','Widowed'];
+const CTYPES=['Individual','Company / CC','Trust','Deceased Estate'];
+const FS={Pending:{bg:'var(--red-bg)',c:'var(--red)'},'In Progress':{bg:'var(--amber-bg)',c:'var(--amber)'},Complete:{bg:'var(--green-bg)',c:'var(--green)'}};
+const BC=()=>({name:'',idNumber:'',type:'Individual',email:'',phone:'',address:'',maritalStatus:'Single',spouseName:'',taxNumber:'',ficaStatus:'Pending',notes:'',createdAt:today()});
+
+function Clients({clients,saveClients}){
+  const[form,setForm]=useState(null);const[search,setSearch]=useState('');
+  const sf=(k,v)=>setForm(p=>({...p,[k]:v}));
+  const filtered=useMemo(()=>clients.filter(c=>{const q=search.toLowerCase();return!q||[c.name,c.idNumber,c.email,c.phone].some(s=>s?.toLowerCase().includes(q));}),[clients,search]);
+  function save(){if(!form.name)return alert('Client name is required.');const c={...form,id:form.id||uid()};saveClients(form.id?clients.map(x=>x.id===c.id?c:x):[...clients,c]);setForm(null);}
+  return<div className="anim">
+    <SHead title="Clients" sub={`${clients.length} clients on record`}
+      action={<Btn variant="navy" onClick={()=>setForm(BC())}>+ New Client</Btn>}/>
+    <Card style={{marginBottom:18,padding:'12px 18px'}}>
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name, ID number, email or phone..."
+        style={{width:'100%',padding:'8px 14px',border:'1px solid var(--g200)',borderRadius:'var(--r-sm)',fontSize:13}}/>
+    </Card>
+    {filtered.length===0?<Card style={{textAlign:'center',padding:52}}>
+      <div style={{fontSize:40,marginBottom:10}}>◎</div>
+      <div style={{fontSize:16,color:'var(--g700)',fontWeight:600}}>No clients found</div>
+    </Card>:
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(290px,1fr))',gap:14}}>
+      {filtered.map(c=>{const fs=FS[c.ficaStatus]||FS.Pending;const initials=c.name.split(' ').map(w=>w[0]||'').slice(0,2).join('').toUpperCase();
+        return<Card key={c.id}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}>
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <div style={{width:40,height:40,borderRadius:'50%',background:'var(--navy)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold)',fontSize:14,fontWeight:700,flexShrink:0}}>{initials||'?'}</div>
+              <div><div style={{fontSize:14,fontWeight:700,color:'var(--g900)'}}>{c.name}</div><div style={{fontSize:11,color:'var(--g400)'}}>{c.type}</div></div>
+            </div>
+            <span style={{background:fs.bg,color:fs.c,fontSize:9,fontWeight:700,padding:'2px 8px',borderRadius:10,letterSpacing:'.04em',whiteSpace:'nowrap'}}>FICA: {c.ficaStatus.toUpperCase()}</span>
+          </div>
+          {[c.idNumber&&['🪪',c.idNumber],c.email&&['✉',c.email],c.phone&&['☏',c.phone],c.maritalStatus&&['♡',c.maritalStatus]].filter(Boolean).map(([k,v])=>(
+            <div key={k} style={{display:'flex',gap:7,fontSize:12,padding:'3px 0',color:'var(--g600)',overflow:'hidden'}}>
+              <span style={{color:'var(--gold)',flexShrink:0,fontSize:12}}>{k}</span>
+              <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{v}</span>
+            </div>
+          ))}
+          <div style={{display:'flex',gap:6,marginTop:12}}>
+            <Btn size="sm" full variant="ghost" onClick={()=>setForm(c)}>Edit</Btn>
+            <Btn size="sm" variant="danger" onClick={()=>{if(confirm('Delete this client?'))saveClients(clients.filter(x=>x.id!==c.id))}}>✕</Btn>
+          </div>
+        </Card>;
+      })}
+    </div>}
+    {form&&<Modal title={form.id?'Edit Client':'New Client'} onClose={()=>setForm(null)} wide>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 22px'}}>
+        <Inp label="Full Name *" required value={form.name} onChange={v=>sf('name',v)}/>
+        <Sel label="Client Type" value={form.type} onChange={v=>sf('type',v)} options={CTYPES}/>
+        <Inp label="ID Number / Company Reg. No." value={form.idNumber} onChange={v=>sf('idNumber',v)} placeholder="RSA ID or CK number"/>
+        <Inp label="Income Tax Number" value={form.taxNumber} onChange={v=>sf('taxNumber',v)}/>
+        <Inp label="Email Address" type="email" value={form.email} onChange={v=>sf('email',v)}/>
+        <Inp label="Phone Number" value={form.phone} onChange={v=>sf('phone',v)}/>
+        <Sel label="Marital Status" value={form.maritalStatus} onChange={v=>sf('maritalStatus',v)} options={MARITAL}/>
+        <Inp label="Spouse / Partner Name" value={form.spouseName} onChange={v=>sf('spouseName',v)}/>
+        <Sel label="FICA Status" value={form.ficaStatus} onChange={v=>sf('ficaStatus',v)} options={['Pending','In Progress','Complete']} style={{gridColumn:'1/-1'}}/>
+      </div>
+      <Inp label="Residential Address" value={form.address} onChange={v=>sf('address',v)} rows={2} placeholder="Full residential address"/>
+      <Inp label="Notes" value={form.notes} onChange={v=>sf('notes',v)} rows={2} placeholder="Any additional notes..."/>
+      <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:8}}>
+        <Btn variant="ghost" onClick={()=>setForm(null)}>Cancel</Btn>
+        <Btn variant="navy" onClick={save}>{form.id?'Save Changes':'Add Client'}</Btn>
+      </div>
+    </Modal>}
+  </div>;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CHECKLISTS
+// ═══════════════════════════════════════════════════════════════
+const CL_SECTIONS=[
+  {id:'buyer',label:'Buyer FICA',color:'#3B82F6',items:['RSA ID / Passport (certified copy)','Proof of Residential Address (3 months)','Income Tax Number','Proof of Source of Funds','Marriage Certificate / ANC (if applicable)','Divorce Order (if applicable)','CIPC Documents + Resolution (company/CC)','Trust Deed + Resolution (if trust)']},
+  {id:'seller',label:'Seller FICA',color:'#8B5CF6',items:['RSA ID / Passport (certified copy)','Proof of Residential Address (3 months)','Income Tax Number','Title Deed (if in possession)','Bond Statements (existing bond accounts)','Marriage Certificate / ANC (if applicable)','Letters of Executorship (if deceased estate)','POA (if seller absent / cannot sign)']},
+  {id:'transfer',label:'Transfer Documents',color:'var(--gold)',items:['Signed Offer to Purchase (original)','FICA — All Parties Complete','Transfer Duty Receipt / SARS proof','Rates Clearance Certificate (municipality)','Levy Clearance Certificate (body corporate)','Body Corporate Approval (sectional title)','Electrical Compliance Certificate (CoC)','Gas Compliance Certificate (if applicable)','Beetle Clearance Certificate (KZN/coastal)','Plumbing Certificate (City of Cape Town)','NHBRC Enrolment Certificate (new dev)','Bond Cancellation Figures','Bond Cancellation Letter','All Deeds Office Documents Signed','Lodgement Package Compiled','Lodged at Deeds Office','Registered — Deeds Delivered']},
+  {id:'bond',label:'Bond Documents',color:'#10B981',items:['Bond Grant Letter / Approval','FICA — Borrower Complete','Valuation Report','Bond Insurance Policy in place','All Bond Conditions Fulfilled','Bond Attorney Documents Signed']},
+];
+
+function Checklists({matters,saveMatters}){
+  const[selId,setSelId]=useState('');
+  const matter=matters.find(m=>m.id===selId);
+  function toggle(sec,item){const updated=matters.map(m=>{if(m.id!==selId)return m;const cl=m.checklist||{};const si=cl[sec]||[];const next=si.includes(item)?si.filter(i=>i!==item):[...si,item];return{...m,checklist:{...cl,[sec]:next}};});saveMatters(updated);}
+  const isChk=(sec,item)=>(matter?.checklist?.[sec]||[]).includes(item);
+  const totalItems=CL_SECTIONS.reduce((s,sec)=>s+sec.items.length,0);
+  const doneItems=matter?CL_SECTIONS.reduce((s,sec)=>s+(matter.checklist?.[sec.id]||[]).length,0):0;
+  const pct=totalItems>0?Math.round((doneItems/totalItems)*100):0;
+  return<div className="anim">
+    <SHead title="Document Checklists" sub="Track FICA compliance and transfer document progress per matter"/>
+    <Card style={{marginBottom:24,padding:'16px 22px'}}>
+      <div style={{display:'flex',alignItems:'center',gap:20}}>
+        <div style={{flex:1}}>
+          <Sel label="Select Matter" value={selId} onChange={setSelId} options={[{v:'',l:'— Choose a matter —'},...matters.map(m=>({v:m.id,l:m.reference+' — '+(m.propertyDesc||'').slice(0,45)}))]}/>
+        </div>
+        {matter&&<div style={{textAlign:'right',flexShrink:0}}>
+          <div className="serif" style={{fontSize:26,fontWeight:700,color:'var(--navy)'}}>{pct}%</div>
+          <div style={{fontSize:12,color:'var(--g500)'}}>{doneItems}/{totalItems} completed</div>
+        </div>}
+      </div>
+      {matter&&<div style={{height:8,background:'var(--g200)',borderRadius:4,overflow:'hidden'}}>
+        <div style={{height:'100%',width:`${pct}%`,background:pct<30?'#EF4444':pct<70?'#F59E0B':'#10B981',borderRadius:4,transition:'width .4s ease'}}/>
+      </div>}
+    </Card>
+    {!matter?<Card style={{textAlign:'center',padding:52}}>
+      <div style={{fontSize:40,marginBottom:10}}>☑</div>
+      <div style={{fontSize:16,color:'var(--g700)',fontWeight:600}}>Select a matter to view its checklist</div>
+    </Card>:
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+      {CL_SECTIONS.map(sec=>{
+        const done=(matter.checklist?.[sec.id]||[]).length;
+        return<Card key={sec.id}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+            <h3 style={{fontSize:14,fontWeight:700,color:'var(--navy)'}}>{sec.label}</h3>
+            <span style={{background:sec.color+'20',color:sec.color,fontSize:11,fontWeight:700,padding:'2px 10px',borderRadius:10}}>{done}/{sec.items.length}</span>
+          </div>
+          {sec.items.map(item=>{const chk=isChk(sec.id,item);return(
+            <label key={item} style={{display:'flex',alignItems:'flex-start',gap:10,padding:'6px 0',cursor:'pointer',borderBottom:'1px solid var(--g50)'}}>
+              <div onClick={()=>toggle(sec.id,item)} style={{width:18,height:18,borderRadius:4,flexShrink:0,marginTop:1,
+                border:chk?`2px solid ${sec.color}`:'2px solid var(--g300)',background:chk?sec.color:'transparent',
+                display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',transition:'all .15s'}}>
+                {chk&&<span style={{color:'#fff',fontSize:11,fontWeight:700,lineHeight:1}}>✓</span>}
+              </div>
+              <span style={{fontSize:12,color:chk?'var(--g400)':'var(--g700)',textDecoration:chk?'line-through':'none',lineHeight:1.5}}>{item}</span>
+            </label>
+          );})}
+        </Card>;
+      })}
+    </div>}
+  </div>;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DEADLINES
+// ═══════════════════════════════════════════════════════════════
+function Deadlines({matters}){
+  const events=useMemo(()=>matters.flatMap(m=>[
+    m.lodgementDate&&{date:m.lodgementDate,label:`${m.reference}: Lodgement`,type:'lodge',ref:m.reference},
+    m.registrationDate&&{date:m.registrationDate,label:`${m.reference}: Registration`,type:'register',ref:m.reference},
+    m.occupationDate&&{date:m.occupationDate,label:`${m.reference}: Occupation`,type:'occupy',ref:m.reference},
+  ].filter(Boolean)).sort((a,b)=>new Date(a.date)-new Date(b.date)),[matters]);
+  const upcoming=events.filter(e=>new Date(e.date)>=new Date());
+  const past=events.filter(e=>new Date(e.date)<new Date());
+  const typeS={lodge:{bg:'var(--purple-bg)',c:'var(--purple)',l:'Lodgement'},register:{bg:'var(--green-bg)',c:'var(--green)',l:'Registration'},occupy:{bg:'var(--amber-bg)',c:'var(--amber)',l:'Occupation'}};
+  return<div className="anim">
+    <SHead title="Deadlines & Calendar" sub={`${upcoming.length} upcoming · ${past.length} past events`}/>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:24}}>
+      <Card>
+        <h3 style={{fontSize:14,fontWeight:700,color:'var(--navy)',marginBottom:16}}>Upcoming Events</h3>
+        {upcoming.length===0?<div style={{textAlign:'center',padding:32,color:'var(--g400)'}}>No upcoming events</div>:
+          upcoming.map((e,i)=>{const d=new Date(e.date+'T00:00:00');const days=Math.ceil((d-new Date())/86400000);const ts=typeS[e.type];
+            return<div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 0',borderBottom:'1px solid var(--g50)'}}>
+              <div style={{width:46,height:46,borderRadius:9,background:ts.bg,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <div className="serif" style={{fontSize:16,fontWeight:700,color:ts.c,lineHeight:1}}>{d.getDate()}</div>
+                <div style={{fontSize:9,color:ts.c,fontWeight:700}}>{d.toLocaleString('en-ZA',{month:'short'}).toUpperCase()}</div>
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,fontWeight:700,color:'var(--g800)'}}>{e.label}</div>
+                <div style={{display:'flex',alignItems:'center',gap:6,marginTop:3}}>
+                  <span style={{background:ts.bg,color:ts.c,padding:'1px 7px',borderRadius:10,fontSize:10,fontWeight:700}}>{ts.l}</span>
+                  <span style={{fontSize:11,color:'var(--g400)'}}>{d.toLocaleDateString('en-ZA',{weekday:'short',day:'numeric',month:'long',year:'numeric'})}</span>
+                </div>
+              </div>
+              <div style={{textAlign:'right',flexShrink:0}}>
+                <div className="mono" style={{fontSize:13,fontWeight:700,color:days<=2?'#DC2626':days<=7?'#D97706':'#059669'}}>{days}d</div>
+                <div style={{fontSize:10,color:'var(--g400)'}}>remaining</div>
+              </div>
+            </div>;})}
+      </Card>
+      <Card>
+        <h3 style={{fontSize:14,fontWeight:700,color:'var(--navy)',marginBottom:16}}>Past Events</h3>
+        {past.length===0?<div style={{textAlign:'center',padding:32,color:'var(--g400)'}}>No past events</div>:
+          [...past].reverse().slice(0,12).map((e,i)=>{const d=new Date(e.date+'T00:00:00');const ts=typeS[e.type];
+            return<div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid var(--g50)',opacity:.7}}>
+              <div style={{width:36,height:36,borderRadius:7,background:'var(--g100)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <div style={{fontSize:13,fontWeight:700,color:'var(--g500)',lineHeight:1}}>{d.getDate()}</div>
+                <div style={{fontSize:8,color:'var(--g400)',fontWeight:600}}>{d.toLocaleString('en-ZA',{month:'short'}).toUpperCase()}</div>
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:600,color:'var(--g600)'}}>{e.label}</div>
+                <span style={{background:ts.bg,color:ts.c,padding:'1px 6px',borderRadius:10,fontSize:10,fontWeight:700}}>{ts.l}</span>
+              </div>
+              <span style={{fontSize:11,color:'var(--green)',fontWeight:600}}>✓ Done</span>
+            </div>;})}
+      </Card>
+    </div>
+  </div>;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RATE CARDS
+// ═══════════════════════════════════════════════════════════════
+function RateCards(){
+  const[aiMsg,setAiMsg]=useState('');const[aiLoading,setAiLoading]=useState(false);
+  async function verifyRates(){
+    setAiLoading(true);setAiMsg('');
+    try{
+      const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,
+          tools:[{type:'web_search_20250305',name:'web_search'}],
+          messages:[{role:'user',content:'What are the current South African transfer duty rates for 2024/2025 from SARS? Have there been any recent updates to the deeds office fees or conveyancing tariffs? Please provide a brief summary of the current rates and any changes.'}]})});
+      const data=await res.json();
+      const text=data.content.filter(c=>c.type==='text').map(c=>c.text).join('\n');
+      setAiMsg(text||'Could not retrieve rate update at this time. Please verify at sars.gov.za');
+    }catch(e){setAiMsg('Error fetching rate update. Please verify manually at www.sars.gov.za and www.justice.gov.za');}
+    setAiLoading(false);
+  }
+  return<div className="anim">
+    <SHead title="Rate Cards" sub="Current South African conveyancing rates · 2024/2025"
+      action={<Btn variant="navy" onClick={verifyRates} disabled={aiLoading}>{aiLoading?'⟳ Verifying...':'⊛ AI Rate Check'}</Btn>}/>
+    {aiMsg&&<Card style={{marginBottom:22,borderColor:'var(--gold)',background:'var(--gold-pale)'}}>
+      <div style={{display:'flex',gap:12}}>
+        <span style={{fontSize:22,flexShrink:0}}>⊛</span>
+        <div><div style={{fontSize:13,fontWeight:700,color:'var(--navy)',marginBottom:6}}>Live AI Rate Verification</div>
+          <div style={{fontSize:13,color:'var(--g600)',lineHeight:1.7,whiteSpace:'pre-line'}}>{aiMsg}</div>
+        </div>
+      </div>
+    </Card>}
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
+      <Card>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+          <h3 style={{fontSize:14,fontWeight:700,color:'var(--navy)'}}>Transfer Duty (SARS 2024/2025)</h3>
+          <span style={{background:'var(--green-bg)',color:'var(--green)',fontSize:10,fontWeight:700,padding:'2px 10px',borderRadius:10}}>CURRENT</span>
+        </div>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+          <thead><tr style={{background:'var(--g50)'}}>{['Value Band','Duty Payable'].map(h=><th key={h} style={{textAlign:'left',padding:'7px 10px',fontWeight:700,color:'var(--g700)',borderBottom:'2px solid var(--g200)'}}>{h}</th>)}</tr></thead>
+          <tbody>{[['R0 – R1,100,000','0% (exempt)'],['R1,100,001 – R1,512,500','3% on value above R1.1M'],['R1,512,501 – R2,117,500','R12,375 + 6% above R1,512,500'],['R2,117,501 – R2,722,500','R48,675 + 8% above R2,117,500'],['R2,722,501 – R12,100,000','R97,075 + 11% above R2,722,500'],['R12,100,001+','R1,128,600 + 13% above R12.1M']].map(([r,d],i)=>(
+            <tr key={i}><td style={{padding:'7px 10px',borderBottom:'1px solid var(--g100)',color:'var(--g700)'}}>{r}</td>
+              <td className="mono" style={{padding:'7px 10px',borderBottom:'1px solid var(--g100)',fontWeight:600,color:'var(--navy)'}}>{d}</td></tr>
+          ))}</tbody>
+        </table>
+        <p style={{fontSize:10,color:'var(--g400)',marginTop:10}}>Source: SARS. New developments attract VAT instead of transfer duty.</p>
+      </Card>
+      <Card>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+          <h3 style={{fontSize:14,fontWeight:700,color:'var(--navy)'}}>GFC Attorney Fee Scale (2024)</h3>
+          <span style={{background:'var(--blue-bg)',color:'var(--blue)',fontSize:10,fontWeight:700,padding:'2px 10px',borderRadius:10}}>APPROVED</span>
+        </div>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+          <thead><tr style={{background:'var(--g50)'}}>{['Value','Fee (excl. VAT)','Incl. VAT'].map(h=><th key={h} style={{textAlign:'left',padding:'6px 8px',fontWeight:700,color:'var(--g700)',borderBottom:'2px solid var(--g200)'}}>{h}</th>)}</tr></thead>
+          <tbody>{[[100000,5900],[200000,8250],[400000,12600],[600000,16400],[800000,19700],[1000000,22600],[1500000,28200],[2000000,33400],[3000000,43400],[5000000,59000]].map(([v,f])=>(
+            <tr key={v}><td style={{padding:'5px 8px',borderBottom:'1px solid var(--g100)'}}>{fmtS(v)}</td>
+              <td className="mono" style={{padding:'5px 8px',borderBottom:'1px solid var(--g100)',fontWeight:600}}>{fmtR(f)}</td>
+              <td className="mono" style={{padding:'5px 8px',borderBottom:'1px solid var(--g100)',color:'var(--g500)'}}>{fmtR(Math.round(f*1.15))}</td></tr>
+          ))}</tbody>
+        </table>
+      </Card>
+    </div>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:20}}>
+      <Card>
+        <h3 style={{fontSize:13,fontWeight:700,color:'var(--navy)',marginBottom:12}}>Deeds Office Fees (2024)</h3>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+          <thead><tr><th style={{textAlign:'left',padding:'5px 6px',fontWeight:700,color:'var(--g700)',borderBottom:'2px solid var(--g200)'}}>Value</th><th style={{textAlign:'left',padding:'5px 6px',fontWeight:700,color:'var(--g700)',borderBottom:'2px solid var(--g200)'}}>Fee</th></tr></thead>
+          <tbody>{[[100000,520],[200000,890],[300000,1190],[500000,1670],[700000,2020],[1000000,2455],[1500000,3040],[2000000,3590],[3000000,4470],[5000000,5750]].map(([v,f])=>(
+            <tr key={v}><td style={{padding:'5px 6px',borderBottom:'1px solid var(--g100)'}}>{fmtS(v)}</td>
+              <td className="mono" style={{padding:'5px 6px',borderBottom:'1px solid var(--g100)',fontWeight:600}}>{fmtR(f)}</td></tr>
+          ))}</tbody>
+        </table>
+      </Card>
+      <Card>
+        <h3 style={{fontSize:13,fontWeight:700,color:'var(--navy)',marginBottom:12}}>Compliance Certificate Estimates</h3>
+        {[['Electrical CoC','R800 – R2,500'],['Gas CoC (if applicable)','R500 – R1,200'],['Beetle Clearance (coastal)','R600 – R1,800'],['Plumbing CoC (Cape Town)','R800 – R2,000'],['Electric Fence CoC','R400 – R800'],['NHBRC Enrolment','~0.65% of cost']].map(([k,v])=>(
+          <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'7px 0',borderBottom:'1px solid var(--g50)',fontSize:12}}>
+            <span style={{color:'var(--g600)'}}>{k}</span><span className="mono" style={{fontWeight:600,color:'var(--navy)'}}>{v}</span>
+          </div>
+        ))}
+      </Card>
+      <Card>
+        <h3 style={{fontSize:13,fontWeight:700,color:'var(--navy)',marginBottom:12}}>Key Reference Rates</h3>
+        {[['VAT Rate','15%'],['Agent Commission','5.75% (incl. VAT)'],['Agent VAT on Comm.','+ 15%'],['Transfer Duty Base','Excl. VAT'],['Rates Clearance','~3 months advance'],['Deeds Lodgement','±10 business days'],['FICA Threshold','R24,999 (EDD)'],['Occupational Interest','~Prime p.a. (pro-rata)'],['ANC Notarial Fees','GFC regulated'],['Conveyancer VAT','15% on all fees']].map(([k,v])=>(
+          <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--g50)',fontSize:12}}>
+            <span style={{color:'var(--g600)'}}>{k}</span><span className="mono" style={{fontWeight:600,color:'var(--navy)'}}>{v}</span>
+          </div>
+        ))}
+      </Card>
+    </div>
+  </div>;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ROOT APP
+// ═══════════════════════════════════════════════════════════════
+function App(){
+  const[view,setView]=useState('dashboard');
+  const[matters,saveMatters]=useLS('matters',[]);
+  const[clients,saveClients]=useLS('clients',[]);
+  const badges=useMemo(()=>({
+    matters:matters.filter(m=>m.status==='Active').length,
+    checklist:matters.filter(m=>m.status==='Pending Docs').length,
+    deadlines:matters.filter(m=>m.registrationDate&&(new Date(m.registrationDate)-new Date())/86400000<=7&&new Date(m.registrationDate)>=new Date()).length,
+  }),[matters]);
+  return<div style={{display:'flex',height:'100%',background:'var(--cream)',overflow:'hidden'}}>
+    <Sidebar view={view} onNav={setView} badges={badges}/>
+    <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      <TopBar view={view}/>
+      <div style={{flex:1,overflowY:'auto',padding:'28px 32px'}}>
+        {view==='dashboard'&&<Dashboard matters={matters} clients={clients} onNav={setView}/>}
+        {view==='matters'&&<Matters matters={matters} saveMatters={saveMatters}/>}
+        {view==='calc'&&<Calculators/>}
+        {view==='clients'&&<Clients clients={clients} saveClients={saveClients}/>}
+        {view==='checklist'&&<Checklists matters={matters} saveMatters={saveMatters}/>}
+        {view==='deadlines'&&<Deadlines matters={matters}/>}
+        {view==='rates'&&<RateCards/>}
+      </div>
+    </div>
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
